@@ -1,0 +1,243 @@
+import React, { useState, useRef } from "react";
+
+// Fake News Detection - Single-file React component
+// Uses Tailwind CSS for styling (no imports required here if your project already has Tailwind)
+// Default export a component that can be dropped into a React app (Vite, Create React App, Next.js page, etc.)
+
+// Expectations for backend API (you must implement or mock it):
+// POST /api/predict
+// body: { text: string }
+// response: { label: "REAL" | "FAKE" | "UNCERTAIN", confidence: 0.0-1.0, explanation?: string }
+
+export default function FakeNewsFrontend() {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const fileRef = useRef(null);
+  const [error, setError] = useState("");
+
+  const samples = [
+    {
+      title: "Sample - Likely real",
+      text:
+        "Le décret publié aujourd'hui clarifie les nouvelles mesures économiques et cite le ministère compétent.",
+    },
+    {
+      title: "Sample - Suspicious",
+      text:
+        "Scientifiques confirment que boire eau salée guérit toutes les maladies, études secrètes révélées!",
+    },
+  ];
+
+  async function submitText(inputText) {
+    setError("");
+    const payload = (inputText || text || "").trim();
+    if (!payload) {
+      setError("Veuillez entrer un texte à analyser.");
+      return;
+    }
+
+    setLoading(true);
+    setResult(null);
+    try {
+      // call backend
+      const res = await fetch("/api/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: payload }),
+      });
+
+      if (!res.ok) {
+        // fallback: parse json body for message when available
+        const body = await res.json().catch(() => null);
+        throw new Error((body && body.message) || `Erreur serveur: ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      // validate response shape
+      const normalized = {
+        label: data.label || "UNCERTAIN",
+        confidence: typeof data.confidence === "number" ? data.confidence : null,
+        explanation: data.explanation || null,
+      };
+
+      const record = {
+        id: Date.now(),
+        text: payload,
+        ...normalized,
+      };
+
+      setResult(normalized);
+      setHistory((h) => [record, ...h].slice(0, 30));
+    } catch (err) {
+      console.error(err);
+      setError("Impossible d'obtenir une réponse du serveur. Vérifiez /api/predict.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Helper: simulate a prediction locally when backend missing
+  function simulatePrediction(inputText) {
+    const t = (inputText || text || "").toLowerCase();
+    let label = "REAL";
+    let confidence = 0.85;
+    if (t.includes("secret") || t.includes("confirme") || t.includes("prouve") || t.includes("guérit")) {
+      label = "FAKE";
+      confidence = 0.72;
+    }
+    if (t.length < 60) {
+      label = "UNCERTAIN";
+      confidence = 0.45;
+    }
+    const data = { label, confidence, explanation: "Prédiction simulée locale — déployez un backend pour résultats réels." };
+    setResult(data);
+    setHistory((h) => [ { id: Date.now(), text: inputText, ...data }, ...h].slice(0,30));
+  }
+
+  function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setText(String(reader.result));
+    reader.readAsText(file);
+  }
+
+  function prettyLabel(label) {
+    if (label === "REAL") return "Probablement vrai";
+    if (label === "FAKE") return "Probablement faux";
+    return "Incertain";
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6 flex items-start justify-center">
+      <div className="max-w-4xl w-full space-y-6">
+        <header className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold">Détecteur de Fake News</h1>
+            <p className="text-sm text-gray-600 mt-1">Collez un article, uploadez un fichier, ou testez un exemple. Backend requis pour vrai ML.</p>
+          </div>
+          <div className="text-xs text-gray-500">Version front-end • Drop-in</div>
+        </header>
+
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <section className="bg-white p-4 rounded-2xl shadow-sm">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Texte à analyser</label>
+            <textarea
+              className="w-full h-40 rounded-md border p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder="Collez l'article ou le passage ici..."
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              aria-label="Texte à analyser"
+            />
+
+            <div className="flex items-center gap-3 mt-3">
+              <input ref={fileRef} onChange={handleFileUpload} type="file" accept="text/*,.txt,.md" className="hidden" />
+              <button
+                onClick={() => fileRef.current && fileRef.current.click()}
+                className="px-3 py-2 rounded-lg border text-sm hover:bg-gray-50"
+              >
+                Charger un fichier
+              </button>
+
+              <button
+                onClick={() => submitText()}
+                disabled={loading}
+                className="ml-auto bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-60"
+              >
+                {loading ? "Analyse..." : "Analyser (backend)"}
+              </button>
+
+              <button
+                onClick={() => simulatePrediction(text)}
+                className="px-3 py-2 rounded-lg border text-sm hover:bg-gray-50"
+              >
+                Simuler localement
+              </button>
+
+            </div>
+
+            {error && <p className="text-red-600 text-sm mt-3">{error}</p>}
+
+            <div className="mt-4">
+              <label className="text-sm font-medium text-gray-700">Exemples rapides</label>
+              <div className="flex gap-2 mt-2">
+                {samples.map((s) => (
+                  <button
+                    key={s.title}
+                    onClick={() => setText(s.text)}
+                    className="px-3 py-1 rounded-lg border text-sm"
+                  >
+                    {s.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <aside className="bg-white p-4 rounded-2xl shadow-sm flex flex-col gap-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-700">Résultat</h3>
+              <div className="mt-2">
+                {result ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-lg font-semibold">{prettyLabel(result.label)}</div>
+                      <div className="text-sm text-gray-500">Confiance: {(result.confidence ?? 0).toFixed(2)}</div>
+                    </div>
+
+                    <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
+                      <div
+                        className={`h-3 rounded-full" style={{ width: `${Math.round((result.confidence ?? 0) * 100)}%` }}`}
+                        aria-hidden
+                        style={{ width: `${Math.round((result.confidence ?? 0) * 100)}%` }}
+                      />
+                    </div>
+
+                    {result.explanation && (
+                      <details className="text-sm text-gray-600 mt-2">
+                        <summary className="cursor-pointer">Détails</summary>
+                        <p className="mt-2">{result.explanation}</p>
+                      </details>
+                    )}
+
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Aucune analyse encore. Collez un texte et cliquez sur analyser.</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium text-gray-700">Historique (récent)</h4>
+              <div className="mt-2 max-h-40 overflow-auto text-sm space-y-2">
+                {history.length === 0 && <div className="text-gray-500">Aucun historique.</div>}
+                {history.map((h) => (
+                  <div key={h.id} className="p-2 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-gray-600 truncate max-w-xs">{h.text}</div>
+                      <div className="text-xs font-semibold">{prettyLabel(h.label)}</div>
+                    </div>
+                    <div className="text-2xs text-gray-400 mt-1">Confiance {(h.confidence ?? 0).toFixed(2)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-auto text-xs text-gray-500">
+              <div>Notes:</div>
+              <ul className="list-disc ml-4 mt-1">
+                <li>Ce composant est uniquement l'interface. Le modèle ML doit tourner côté serveur.</li>
+                <li>Autorisez CORS et rate-limiting côté backend en production.</li>
+              </ul>
+            </div>
+          </aside>
+        </main>
+
+        <footer className="text-sm text-gray-600">API contract: POST /api/predict  — body: {"text":"..."} — response: {{label, confidence, explanation}}</footer>
+      </div>
+    </div>
+  );
+}
