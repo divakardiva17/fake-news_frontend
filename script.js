@@ -1,4 +1,4 @@
-const API_URL = "https://your-backend-service.onrender.com/api/predict"; 
+const API_URL = "https://fake-news-backend-2-4vy7.onrender.com"; 
 // replace with actual backend URL
 
 document.getElementById("predictBtn").addEventListener("click", async () => {
