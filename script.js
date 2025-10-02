@@ -6,7 +6,7 @@ async function predictNews() {
   }
 
   try {
-    const res = await fetch("https://YOUR-BACKEND-RENDER-URL.onrender.com/predict", {
+    const res = await fetch("https://fake-news-backend-9.onrender.com/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: text })
