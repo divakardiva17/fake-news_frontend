@@ -1,27 +1,24 @@
-document.getElementById("predictBtn").addEventListener("click", () => {
-  const text = document.getElementById("newsText").value.trim();
-  if (!text) {
-    alert("Please enter some text.");
-    return;
-  }
+const API_URL = "https://your-backend-service.onrender.com/api/predict"; 
+// replace with actual backend URL
 
-  fetch("http://localhost:5000/predict", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ text: text })
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.prediction) {
-      document.getElementById("result").innerText = `Prediction: ${data.prediction}`;
-    } else if (data.error) {
-      document.getElementById("result").innerText = `Error: ${data.error}`;
+document.getElementById("predictBtn").addEventListener("click", async () => {
+  const text = document.getElementById("newsText").value.trim();
+  const resultDiv = document.getElementById("result");
+  resultDiv.textContent = "Predicting...";
+
+  try {
+    const resp = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const data = await resp.json();
+    if (data.error) {
+      resultDiv.textContent = "Error: " + data.error;
+    } else {
+      resultDiv.innerHTML = `<b>Label:</b> ${data.label} <br> <b>Confidence:</b> ${(data.probability*100).toFixed(1)}%`;
     }
-  })
-  .catch(err => {
-    console.error("Error while calling API:", err);
-    document.getElementById("result").innerText = "Error calling prediction service.";
-  });
+  } catch (err) {
+    resultDiv.textContent = "Error: " + err.message;
+  }
 });
