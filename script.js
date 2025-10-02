@@ -1,5 +1,5 @@
 // ✅ Use your Render backend API URL here
-const API_URL = " https://fake-news-backend-3.onrender.com/api/predict";
+const API_URL = "https://fake-news-backend-4.onrender.com/api/predict";
 
 document.getElementById("predictBtn").addEventListener("click", async () => {
   const text = document.getElementById("newsText").value.trim();
